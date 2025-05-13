@@ -122,9 +122,14 @@ function fuzzyMatchChain(name, chains) {
     });
 }
 
-// 验证以太坊地址格式
+// 验证地址格式
 function isValidAddress(address) {
-    return /^0x[a-fA-F0-9]{40}$/.test(address);
+    // 支持以太坊地址格式（0x开头，42个字符）
+    const ethPattern = /^0x[a-fA-F0-9]{40}$/;
+    // 支持 Solana 地址格式（base58编码，32-44个字符）
+    const solPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    
+    return ethPattern.test(address) || solPattern.test(address);
 }
 
 // 新增：1/0转✅/❌辅助函数
@@ -153,7 +158,7 @@ function formatSecurityAnalysisToCard(result) {
 
     const elements = [];
     for (const [address, data] of Object.entries(result.result)) {
-        // 1. Contract Security
+        // 1. 代币基本信息
         elements.push({
             tag: "div",
             text: {
@@ -162,6 +167,33 @@ function formatSecurityAnalysisToCard(result) {
             }
         });
 
+        // 2. 代币信息
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: "**代币信息**"
+            }
+        });
+
+        const tokenInfo = [
+            [`名称`, data.metadata?.name || data.token_name],
+            [`符号`, data.metadata?.symbol || data.token_symbol],
+            [`描述`, data.metadata?.description],
+            [`持有人数量`, data.holder_count ? data.holder_count.toLocaleString() : null],
+            [`总供应量`, data.total_supply ? parseFloat(data.total_supply).toLocaleString() : null]
+        ].filter(([k, v]) => v !== null && v !== undefined && v !== '未知')
+         .map(([k, v]) => `${k}: ${v}`);
+
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: tokenInfo.join('\n')
+            }
+        });
+
+        // 3. 合约安全
         elements.push({
             tag: "div",
             text: {
@@ -170,18 +202,17 @@ function formatSecurityAnalysisToCard(result) {
             }
         });
 
-        // 只输出非未知项
         const contractSecurity = [
-            [`开源`, boolToEmoji(data.is_open_source)],
-            [`代理`, boolToEmoji(data.is_proxy)],
-            [`可铸造`, boolToEmoji(data.is_mintable)],
-            [`所有者地址`, data.owner_address ?? '未知'],
-            [`可收回所有权`, boolToEmoji(data.can_take_back_ownership)],
-            [`所有者变更余额`, boolToEmoji(data.owner_change_balance)],
-            [`隐藏所有者`, boolToEmoji(data.hidden_owner)],
-            [`自毁`, boolToEmoji(data.selfdestruct)],
-            [`外部调用`, boolToEmoji(data.external_call)],
-            [`Gas滥用`, boolToEmoji(data.gas_abuse)]
+            [`是否开源`, boolToEmoji(data.is_open_source)],
+            [`是否代理`, boolToEmoji(data.is_proxy)],
+            [`是否可铸造`, boolToEmoji(data.is_mintable || data.mintable?.status === '1')],
+            [`是否可冻结`, boolToEmoji(data.freezable?.status === '1')],
+            [`是否可关闭`, boolToEmoji(data.closable?.status === '1')],
+            [`是否可转账`, boolToEmoji(data.non_transferable === '0')],
+            [`是否可信代币`, boolToEmoji(data.trusted_token === 1)],
+            [`是否可暂停转账`, boolToEmoji(data.transfer_pausable === '1')],
+            [`是否可自毁`, boolToEmoji(data.selfdestruct === '1')],
+            [`是否可外部调用`, boolToEmoji(data.external_call === '1')]
         ].filter(([k, v]) => v !== '未知')
          .map(([k, v]) => `${k}: ${v}`);
 
@@ -193,7 +224,7 @@ function formatSecurityAnalysisToCard(result) {
             }
         });
 
-        // 2. Trading Security
+        // 4. 交易安全
         elements.push({
             tag: "div",
             text: {
@@ -203,21 +234,15 @@ function formatSecurityAnalysisToCard(result) {
         });
 
         const tradingSecurity = [
-            [`在DEX中`, boolToEmoji(data.is_in_dex)],
-            [`买入税`, boolToEmoji(data.buy_tax)],
-            [`卖出税`, boolToEmoji(data.sell_tax)],
-            [`转账税`, boolToEmoji(data.transfer_tax)],
-            [`无法买入`, boolToEmoji(data.cannot_buy)],
-            [`无法全部卖出`, boolToEmoji(data.cannot_sell_all)],
-            [`滑点可修改`, boolToEmoji(data.slippage_modifiable)],
-            [`蜜罐`, boolToEmoji(data.is_honeypot)],
-            [`转账可暂停`, boolToEmoji(data.transfer_pausable)],
-            [`黑名单`, boolToEmoji(data.is_blacklisted)],
-            [`白名单`, boolToEmoji(data.is_whitelisted)],
-            [`反鲸鱼`, boolToEmoji(data.is_anti_whale)],
-            [`反鲸鱼可修改`, boolToEmoji(data.anti_whale_modifiable)],
-            [`交易冷却`, boolToEmoji(data.trading_cooldown)],
-            [`个人滑点可修改`, boolToEmoji(data.personal_slippage_modifiable)]
+            [`是否在DEX中`, boolToEmoji(data.is_in_dex)],
+            [`是否在CEX中`, boolToEmoji(data.is_in_cex?.listed === '1')],
+            [`买入税`, data.buy_tax ? `${data.buy_tax}%` : '0%'],
+            [`卖出税`, data.sell_tax ? `${data.sell_tax}%` : '0%'],
+            [`转账税`, data.transfer_tax ? `${data.transfer_tax}%` : '0%'],
+            [`是否黑名单`, boolToEmoji(data.is_blacklisted === '1')],
+            [`是否白名单`, boolToEmoji(data.is_whitelisted === '1')],
+            [`是否反鲸鱼`, boolToEmoji(data.is_anti_whale === '1')],
+            [`是否蜜罐`, boolToEmoji(data.is_honeypot === '1')]
         ].filter(([k, v]) => v !== '未知')
          .map(([k, v]) => `${k}: ${v}`);
 
@@ -229,79 +254,95 @@ function formatSecurityAnalysisToCard(result) {
             }
         });
 
-        // 3. Info Security
-        elements.push({
-            tag: "div",
-            text: {
-                tag: "lark_md",
-                content: "**代币信息**"
-            }
-        });
-
-        const tokenInfo = [
-            [`代币名称`, data.token_name ?? '未知'],
-            [`代币符号`, data.token_symbol ?? '未知'],
-            [`持有人数量`, data.holder_count ?? '未知'],
-            [`总供应量`, data.total_supply ?? '未知']
-        ].filter(([k, v]) => v !== '未知')
-         .map(([k, v]) => `${k}: ${v}`);
-
-        elements.push({
-            tag: "div",
-            text: {
-                tag: "lark_md",
-                content: tokenInfo.join('\n')
-            }
-        });
-
-        // Top10 LP 持币地址
-        if (Array.isArray(data.lp_holders) && data.lp_holders.length > 0) {
-            const top10 = data.lp_holders.slice(0, 10).map((h, idx) => {
-                const addr = h.address ?? '未知';
-                const bal = h.balance ?? '未知';
-                const pct = h.percent ?? '未知';
-                const locked = h.is_locked !== undefined && h.is_locked !== null ? (h.is_locked ? '✅' : '❌') : '';
-                const tag = h.tag ? ` | Tag: ${h.tag}` : '';
-                let line = `#${idx + 1} ${addr}`;
-                if (bal !== '未知') line += ` | 余额: ${bal}`;
-                if (pct !== '未知') line += ` | 占比: ${pct}%`;
-                if (locked) line += ` | Locked: ${locked}`;
-                if (tag) line += tag;
-                return line;
-            });
+        // 5. DEX 信息
+        if (data.dex && data.dex.length > 0) {
             elements.push({
                 tag: "div",
                 text: {
                     tag: "lark_md",
-                    content: `**Top10 LP 持币地址**\n${top10.join('\n')}`
+                    content: "**DEX 信息**"
+                }
+            });
+
+            const mainDex = data.dex[0];
+            const dexInfo = [
+                [`DEX名称`, mainDex.dex_name || mainDex.name],
+                [`流动性类型`, mainDex.liquidity_type],
+                [`流动性`, mainDex.liquidity ? `$${parseFloat(mainDex.liquidity).toLocaleString()}` : null],
+                [`价格`, mainDex.price ? `$${parseFloat(mainDex.price).toLocaleString()}` : null],
+                [`TVL`, mainDex.tvl ? `$${parseFloat(mainDex.tvl).toLocaleString()}` : null]
+            ].filter(([k, v]) => v !== null && v !== undefined && v !== '未知')
+             .map(([k, v]) => `${k}: ${v}`);
+
+            elements.push({
+                tag: "div",
+                text: {
+                    tag: "lark_md",
+                    content: dexInfo.join('\n')
                 }
             });
         }
 
-        // 5. Advanced Info
-        elements.push({
-            tag: "div",
-            text: {
-                tag: "lark_md",
-                content: "**高级信息**"
-            }
-        });
+        // 6. 持有者分布
+        if (data.holders && data.holders.length > 0) {
+            elements.push({
+                tag: "div",
+                text: {
+                    tag: "lark_md",
+                    content: "**前10大持有者**"
+                }
+            });
 
-        const advancedInfo = [
-            [`空投诈骗`, boolToEmoji(data.is_airdrop_scam)],
-            [`信任列表`, boolToEmoji(data.trust_list)],
-            [`其他潜在风险`, boolToEmoji(data.other_potential_risks)],
-            [`备注`, data.note ?? '未知']
-        ].filter(([k, v]) => v !== '未知')
-         .map(([k, v]) => `${k}: ${v}`);
+            const holdersInfo = data.holders.slice(0, 10).map((holder, index) => {
+                const addr = holder.address || holder.account;
+                if (!addr) return null;
+                const shortAddr = addr.length > 16 ? `${addr.slice(0, 8)}...${addr.slice(-8)}` : addr;
+                const balance = parseFloat(holder.balance).toLocaleString();
+                const percent = parseFloat(holder.percent).toFixed(4);
+                return `${index + 1}. ${shortAddr}: ${balance} (${percent}%)`;
+            }).filter(Boolean);
 
-        elements.push({
-            tag: "div",
-            text: {
-                tag: "lark_md",
-                content: advancedInfo.join('\n')
+            elements.push({
+                tag: "div",
+                text: {
+                    tag: "lark_md",
+                    content: holdersInfo.join('\n')
+                }
+            });
+        }
+
+        // 7. 元数据权限
+        if (data.metadata_mutable) {
+            elements.push({
+                tag: "div",
+                text: {
+                    tag: "lark_md",
+                    content: "**元数据权限**"
+                }
+            });
+
+            const metadataInfo = [
+                [`可升级`, boolToEmoji(data.metadata_mutable.status === '1')]
+            ];
+
+            if (data.metadata_mutable.metadata_upgrade_authority) {
+                const authority = data.metadata_mutable.metadata_upgrade_authority[0];
+                if (authority) {
+                    metadataInfo.push(
+                        [`升级权限地址`, authority.address],
+                        [`是否恶意地址`, boolToEmoji(authority.malicious_address === 1)]
+                    );
+                }
             }
-        });
+
+            elements.push({
+                tag: "div",
+                text: {
+                    tag: "lark_md",
+                    content: metadataInfo.map(([k, v]) => `${k}: ${v}`).join('\n')
+                }
+            });
+        }
     }
 
     return {
@@ -318,6 +359,7 @@ function formatSecurityAnalysisToCard(result) {
 // 创建事件分发器
 const eventDispatcher = new lark.EventDispatcher({}).register({
     'im.message.receive_v1': async (data) => {
+        let open_chat_id;  // 将变量声明移到函数开头
         try {
             console.log('开始处理消息事件');
             console.log('事件数据:', JSON.stringify(data, null, 2));
@@ -328,7 +370,7 @@ const eventDispatcher = new lark.EventDispatcher({}).register({
                 return { code: 1, msg: '无效的事件数据结构' };
             }
 
-            const open_chat_id = data.message.chat_id;
+            open_chat_id = data.message.chat_id;  // 在这里赋值
             const msg = JSON.parse(data.message.content).text;
             console.log('收到消息:', msg);
 
@@ -382,7 +424,7 @@ const eventDispatcher = new lark.EventDispatcher({}).register({
                     data: {
                         receive_id: open_chat_id,
                         content: JSON.stringify({
-                            text: "无效的代币地址格式，请确保地址以0x开头，长度为42个字符"
+                            text: "无效的代币地址格式，请确保地址符合以下格式之一：\n1. 以太坊地址：以0x开头，长度为42个字符\n2. Solana地址：Base58编码，长度为32-44个字符"
                         }),
                         msg_type: 'text',
                     },

@@ -1,0 +1,152 @@
+{
+  "code": 1,
+  "message": "ok",
+  "result": {
+    "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3": {
+      "balance_mutable_authority": {
+        "authority": [],
+        "status": "0"
+      },
+      "closable": {
+        "authority": [],
+        "status": "0"
+      },
+      "creators": [],
+      "default_account_state": "1",
+      "default_account_state_upgradable": {
+        "authority": [],
+        "status": "0"
+      },
+      "freezable": {
+        "authority": [],
+        "status": "0"
+      },
+      "holder_count": "321551",
+      "holders": [
+        {
+          "account": "5WumPYv4jDPRqWjWr3EeybLczpcohHrMPShK9WQ85qfY",
+          "balance": "1287324551.688186",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.1287",
+          "tag": "",
+          "token_account": "23KfDBTdpaBqfn8aUeoEDgfGJ5368gpnyYGfNkKcECqM"
+        },
+        {
+          "account": "5cz3Jz3QnDmTsQiw5MwkfV9tq4zf2yCzWcH7tXq5BxCw",
+          "balance": "1026437495.9975",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.1026",
+          "tag": "",
+          "token_account": "Eq9dm4pHewdSVaKdpVJogjLW6upd9hNkiboX2eSncmFV"
+        },
+        {
+          "account": "E294htaeagKoGLJmCpr4gkJF3B4uUEnTcq7kExX7WJGM",
+          "balance": "638325572.0",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0638",
+          "tag": "",
+          "token_account": "5ULtZcyfuWvKuwB555WN4W1vsVW4F3yHU9UW1Gd7kAWy"
+        },
+        {
+          "account": "esYj5AxtpzStxFo6sq8QYUkeg1z85UJydxgd6AgeyHC",
+          "balance": "500000000.0",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0500",
+          "tag": "",
+          "token_account": "ADBN766ykF4HdkNa7Az8BVrpaQdvSpaMMULufBAs8U1B"
+        },
+        {
+          "account": "Ep6aZ3eNtiBpLSNeweGDMbjRPRtjGkFPugnHp81U79Jb",
+          "balance": "450000000.0",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0450",
+          "tag": "",
+          "token_account": "61YcP8msC5F3ZTLy99VWM2oom6y47UzNmSQQdXMmdCG1"
+        },
+        {
+          "account": "8m5Aj17QvyLXuS747LEWMhoQ7gWrSNXia2ZfpBK4C5za",
+          "balance": "390249714.264602",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0390",
+          "tag": "",
+          "token_account": "52AXihP4T7dgtfxFMjjLBFVGucNvHmxMW5GkvM1vQyFU"
+        },
+        {
+          "account": "PTVDJYvY11PisYFKkHWBmq15nxEWKy4LCJfK9GzLRY6",
+          "balance": "388987502.25",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0389",
+          "tag": "",
+          "token_account": "984XkyV6X29LUYSi476KC5cTFNMyegrx81EfHj6qWSeV"
+        },
+        {
+          "account": "AE8SnajswPd8XJs2pnSXe8XJuX2QFcBbC8vq61hm6qax",
+          "balance": "375000000.0",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0375",
+          "tag": "",
+          "token_account": "DXu8wVJigvqBLNf18QYQbHn7hcvVWnCpCMoYAPuQGEyr"
+        },
+        {
+          "account": "2UuF65WXpcrRby2QAbFC2BzDieWTfyNboNxUXKizx33U",
+          "balance": "346449999.75",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0346",
+          "tag": "",
+          "token_account": "7p1D1WBPr3sK9TYwrRwVcjYwacXhMH3WdJqqyowbvD1f"
+        },
+        {
+          "account": "Ffz4sGA4ZM5i5s6dgP4oHNUoc5q4pEV3gTarULYcjc2Q",
+          "balance": "300594164.3345",
+          "is_locked": 0,
+          "locked_detail": [],
+          "percent": "0.0301",
+          "tag": "",
+          "token_account": "3XSoALqyVbG1ZMgmTwNcuUf294LzjUj7Mvy7MgA7YNVk"
+        }
+      ],
+      "lp_holders": [],
+      "metadata": {
+        "description": "Governance Token for the Pyth Network oracle.",
+        "name": "Pyth Network",
+        "symbol": "PYTH",
+        "uri": "https://arweave.net/GWKBRfaCBSiDWs0hYHe_PCEEhKoq_Bl3JlpmW5MqRnE"
+      },
+      "metadata_mutable": {
+        "metadata_upgrade_authority": [
+          {
+            "address": "HVx4oW785bu8QDQ8AwSVfD7H4iuH51ttakc2G5f9XTX8",
+            "malicious_address": 0
+          }
+        ],
+        "status": "1"
+      },
+      "mintable": {
+        "authority": [],
+        "status": "0"
+      },
+      "non_transferable": "0",
+      "total_supply": "9999987107.243799",
+      "transfer_fee": {},
+      "transfer_fee_upgradable": {
+        "authority": [],
+        "status": "0"
+      },
+      "transfer_hook": [],
+      "transfer_hook_upgradable": {
+        "authority": [],
+        "status": "0"
+      },
+      "trusted_token": 1
+    }
+  }
+}

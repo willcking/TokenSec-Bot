@@ -39,151 +39,173 @@ async function checkTokenSecurity(chainId, address, timeout = null) {
     const cachedResult = tokenCache.get(cacheKey);
     if (cachedResult) return cachedResult;
 
-    const url = `https://api.gopluslabs.io/api/v1/token_security/${chainId}`;
+    // 对于 Solana 地址，使用专门的 API 端点
+    const url = chainId === 'solana' 
+        ? `${BASE_URL}/solana/token_security`
+        : `${BASE_URL}/token_security/${chainId}`;
+    
+    // 所有链都使用 contract_addresses 参数
     const params = { contract_addresses: address };
+
     try {
+        console.log('请求URL:', url);
+        console.log('请求参数:', params);
+        
         const response = await axios.get(url, {
             params,
-            timeout: timeout ? timeout * 1000 : undefined
+            timeout: timeout ? timeout * 1000 : undefined,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
         });
+        
+        console.log('API响应:', JSON.stringify(response.data, null, 2));
+        
+        // 检查 API 错误响应
+        if (response.data && response.data.code && response.data.code !== 1) {
+            // 对于 Solana 特定的错误处理
+            if (chainId === 'solana' && response.data.code === 2007) {
+                throw new Error('该 Solana 代币地址未被收录，请确认地址是否正确或稍后再试');
+            }
+            throw new Error(response.data.message || 'API 请求失败');
+        }
+        
+        if (!response.data || !response.data.result) {
+            throw new Error('无法获取代币安全信息，请确认代币地址是否正确');
+        }
+
+        // 处理 Solana 代币数据
+        if (chainId === 'solana') {
+            const solanaData = response.data.result[address];
+            if (solanaData) {
+                // 确保所有必要的字段都存在
+                solanaData.metadata = solanaData.metadata || {};
+                solanaData.metadata_mutable = solanaData.metadata_mutable || {};
+                solanaData.holders = solanaData.holders || [];
+                solanaData.creators = solanaData.creators || [];
+                
+                // 添加默认值
+                solanaData.mintable = solanaData.mintable || { status: '0' };
+                solanaData.freezable = solanaData.freezable || { status: '0' };
+                solanaData.closable = solanaData.closable || { status: '0' };
+                solanaData.non_transferable = solanaData.non_transferable || '0';
+                solanaData.trusted_token = solanaData.trusted_token || 0;
+                solanaData.default_account_state = solanaData.default_account_state || '0';
+                solanaData.default_account_state_upgradable = solanaData.default_account_state_upgradable || { status: '0' };
+                solanaData.transfer_fee_upgradable = solanaData.transfer_fee_upgradable || { status: '0' };
+                solanaData.transfer_hook_upgradable = solanaData.transfer_hook_upgradable || { status: '0' };
+                solanaData.balance_mutable_authority = solanaData.balance_mutable_authority || { status: '0' };
+                solanaData.transfer_fee = solanaData.transfer_fee || {};
+                solanaData.transfer_hook = solanaData.transfer_hook || [];
+
+                // 打印处理后的数据
+                console.log('处理后的 Solana 数据:', JSON.stringify(solanaData, null, 2));
+            }
+        }
+        
         tokenCache.set(cacheKey, response.data);
         return response.data;
     } catch (error) {
         console.error(`安全检查过程中出错: ${error.message}`);
+        if (error.response) {
+            console.error('错误响应数据:', error.response.data);
+            console.error('错误状态码:', error.response.status);
+        }
         throw error;
     }
 }
 
 /**
- * 验证以太坊地址格式
+ * 验证地址格式
  * @param {string} address - 待验证的地址
  * @returns {boolean}
  */
 function isValidAddress(address) {
-    return /^0x[a-fA-F0-9]{40}$/.test(address);
+    // 支持以太坊地址格式（0x开头，42个字符）
+    const ethPattern = /^0x[a-fA-F0-9]{40}$/;
+    // 支持 Solana 地址格式（base58编码，32-44个字符）
+    const solPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    
+    return ethPattern.test(address) || solPattern.test(address);
 }
 
 /**
  * 打印安全分析结果
- * @param {Object} result - 安全检测结果
+ * @param {Object} data - 安全检测结果
+ * @param {string} chainId - 链ID
+ * @returns {string} 安全分析结果字符串
  */
-function printSecurityAnalysis(result) {
-    if (!result || !result.result) {
-        console.log("无法获取安全分析结果");
-        return;
+function printSecurityAnalysis(data, chainId) {
+    if (!data) {
+        return "❌ 无法获取安全分析结果";
     }
 
-    for (const [address, data] of Object.entries(result.result)) {
-        console.log(`\n=== 合约地址: ${address} ===`);
+    const tokenData = chainId === 'solana' ? data : data[Object.keys(data)[0]];
+    if (!tokenData) {
+        return "❌ 无法获取代币数据";
+    }
 
-        // 1. Contract Security
-        console.log("\n--- Contract Security ---");
-        console.log(`is_open_source: ${data.is_open_source ?? '未知'}`);
-        console.log(`is_proxy: ${data.is_proxy ?? '未知'}`);
-        console.log(`is_mintable: ${data.is_mintable ?? '未知'}`);
-        console.log(`owner_address: ${data.owner_address ?? '未知'}`);
-        console.log(`can_take_back_ownership: ${data.can_take_back_ownership ?? '未知'}`);
-        console.log(`owner_change_balance: ${data.owner_change_balance ?? '未知'}`);
-        console.log(`hidden_owner: ${data.hidden_owner ?? '未知'}`);
-        console.log(`selfdestruct: ${data.selfdestruct ?? '未知'}`);
-        console.log(`external_call: ${data.external_call ?? '未知'}`);
-        console.log(`gas_abuse: ${data.gas_abuse ?? '未知'}`);
+    let result = `🔍 代币安全分析结果\n\n`;
 
-        // 2. Trading Security
-        console.log("\n--- Trading Security ---");
-        console.log(`is_in_dex: ${data.is_in_dex ?? '未知'}`);
-        console.log(`buy_tax: ${data.buy_tax ?? '未知'}`);
-        console.log(`sell_tax: ${data.sell_tax ?? '未知'}`);
-        console.log(`transfer_tax: ${data.transfer_tax ?? '未知'}`);
-        console.log(`cannot_buy: ${data.cannot_buy ?? '未知'}`);
-        console.log(`cannot_sell_all: ${data.cannot_sell_all ?? '未知'}`);
-        console.log(`slippage_modifiable: ${data.slippage_modifiable ?? '未知'}`);
-        console.log(`is_honeypot: ${data.is_honeypot ?? '未知'}`);
-        console.log(`transfer_pausable: ${data.transfer_pausable ?? '未知'}`);
-        console.log(`is_blacklisted: ${data.is_blacklisted ?? '未知'}`);
-        console.log(`is_whitelisted: ${data.is_whitelisted ?? '未知'}`);
-        console.log(`is_anti_whale: ${data.is_anti_whale ?? '未知'}`);
-        console.log(`anti_whale_modifiable: ${data.anti_whale_modifiable ?? '未知'}`);
-        console.log(`trading_cooldown: ${data.trading_cooldown ?? '未知'}`);
-        console.log(`personal_slippage_modifiable: ${data.personal_slippage_modifiable ?? '未知'}`);
+    // 代币基本信息
+    if (tokenData.metadata) {
+        result += `📝 代币信息\n`;
+        result += `名称: ${tokenData.metadata.name || '未知'}\n`;
+        result += `符号: ${tokenData.metadata.symbol || '未知'}\n`;
+        result += `描述: ${tokenData.metadata.description || '未知'}\n\n`;
+    }
 
-        // Dex list
-        const dexList = data.dex || [];
-        console.log("\nDex 信息:");
-        if (dexList.length > 0) {
-            dexList.forEach(dex => {
-                console.log(` - ${dex.name || '未知'} | 池地址: ${dex.pair || '未知'} | 流动性 (USD): ${dex.liquidity || '未知'}`);
-            });
-        } else {
-            console.log(" 无 Dex 信息");
+    // 代币安全特性
+    result += `🔒 安全特性\n`;
+    result += `总供应量: ${tokenData.total_supply || '未知'}\n`;
+    result += `持有者数量: ${tokenData.holder_count || '未知'}\n`;
+    result += `是否可铸造: ${tokenData.mintable?.status === '0' ? '否' : '是'}\n`;
+    result += `是否可冻结: ${tokenData.freezable?.status === '0' ? '否' : '是'}\n`;
+    result += `是否可关闭: ${tokenData.closable?.status === '0' ? '否' : '是'}\n`;
+    result += `是否可转账: ${tokenData.non_transferable === '0' ? '是' : '否'}\n`;
+    result += `是否可信代币: ${tokenData.trusted_token === 1 ? '是' : '否'}\n\n`;
+
+    // DEX 信息
+    if (tokenData.dex && tokenData.dex.length > 0) {
+        result += `💱 DEX 信息\n`;
+        const mainDex = tokenData.dex[0]; // 使用第一个 DEX 作为主要信息
+        result += `DEX: ${mainDex.dex_name}\n`;
+        result += `价格: $${mainDex.price}\n`;
+        result += `TVL: $${mainDex.tvl}\n`;
+        result += `手续费率: ${(parseFloat(mainDex.fee_rate) * 100).toFixed(2)}%\n`;
+        
+        if (mainDex.day) {
+            result += `24h 交易量: $${mainDex.day.volume}\n`;
+            result += `24h 最高价: $${mainDex.day.price_max}\n`;
+            result += `24h 最低价: $${mainDex.day.price_min}\n`;
         }
+        result += '\n';
+    }
 
-        // 3. Info Security
-        console.log("\n--- Info Security ---");
-        console.log(`token_name: ${data.token_name ?? '未知'}`);
-        console.log(`token_symbol: ${data.token_symbol ?? '未知'}`);
-        console.log(`holder_count: ${data.holder_count ?? '未知'}`);
-        console.log(`total_supply: ${data.total_supply ?? '未知'}`);
+    // 持有者分布
+    if (tokenData.holders && tokenData.holders.length > 0) {
+        result += `👥 前10大持有者\n`;
+        tokenData.holders.slice(0, 10).forEach((holder, index) => {
+            result += `${index + 1}. ${holder.account.slice(0, 8)}...${holder.account.slice(-8)}: ${holder.balance} (${holder.percent}%)\n`;
+        });
+        result += '\n';
+    }
 
-        const holders = data.holders || [];
-        console.log("\nTop10 持币地址:");
-        if (holders.length > 0) {
-            holders.slice(0, 10).forEach(holder => {
-                console.log(` - ${holder.address || '未知'} | 余额: ${holder.balance || '未知'} | 占比: ${holder.percent || '未知'}% | Locked: ${holder.is_locked ?? '未知'} | Tag: ${holder.tag || ''}`);
-            });
-        } else {
-            console.log(" 无持币分布");
-        }
-
-        // 4. Liquidity Info
-        console.log("\n--- Liquidity Info ---");
-        console.log(`lp_holder_count: ${data.lp_holder_count ?? '未知'}`);
-        console.log(`lp_total_supply: ${data.lp_total_supply ?? '未知'}`);
-
-        const lpHolders = data.lp_holders || [];
-        console.log("\nTop10 LP 持币地址:");
-        if (lpHolders.length > 0) {
-            lpHolders.slice(0, 10).forEach(lp => {
-                console.log(` - ${lp.address || '未知'} | 余额: ${lp.balance || '未知'} | 占比: ${lp.percent || '未知'}% | Locked: ${lp.is_locked ?? '未知'} | Tag: ${lp.tag || ''}`);
-                
-                if (lp.nft_list) {
-                    lp.nft_list.forEach(nft => {
-                        console.log(`    · NFT ${nft.nft_id || '未知'}: 价值 ${nft.value || '未知'} | 数量 ${nft.amount || '未知'} | 生效: ${nft.in_effect || '未知'} | 占比: ${nft.nft_percentage || '未知'}%`);
-                    });
-                }
-            });
-        } else {
-            console.log(" 无 LP 持币分布");
-        }
-
-        // 5. Advanced Info
-        console.log("\n--- Advanced Info ---");
-        console.log(`is_airdrop_scam: ${data.is_airdrop_scam ?? '未知'}`);
-        console.log(`trust_list: ${data.trust_list ?? '未知'}`);
-        console.log(`other_potential_risks: ${data.other_potential_risks ?? '未知'}`);
-        console.log(`note: ${data.note ?? '未知'}`);
-
-        // Fake token
-        if (data.fake_token) {
-            console.log(`fake_token → true_token_address: ${data.fake_token.true_token_address || '未知'} | value: ${data.fake_token.value || '未知'}`);
-        } else {
-            console.log("fake_token: 无");
-        }
-
-        // CEX listing
-        if (data.is_in_cex) {
-            console.log(`is_in_cex → listed: ${data.is_in_cex.listed || '未知'} | cex_list: ${data.is_in_cex.cex_list || []}`);
-        } else {
-            console.log("is_in_cex: 无");
-        }
-
-        // Launchpad
-        if (data.launchpad_token) {
-            console.log(`launchpad_token → is_launchpad_token: ${data.launchpad_token.is_launchpad_token || '未知'} | launchpad_name: ${data.launchpad_token.launchpad_name || '未知'}`);
-        } else {
-            console.log("launchpad_token: 无");
+    // 元数据权限
+    if (tokenData.metadata_mutable) {
+        result += `🔑 元数据权限\n`;
+        result += `可升级: ${tokenData.metadata_mutable.status === '1' ? '是' : '否'}\n`;
+        if (tokenData.metadata_mutable.metadata_upgrade_authority) {
+            const authority = tokenData.metadata_mutable.metadata_upgrade_authority[0];
+            if (authority) {
+                result += `升级权限地址: ${authority.address}\n`;
+                result += `是否恶意地址: ${authority.malicious_address === 1 ? '是' : '否'}\n`;
+            }
         }
     }
+
+    return result;
 }
 
 /**
@@ -286,6 +308,183 @@ async function batchCheckTokens(chainId, addresses, timeout = null) {
 }
 
 /**
+ * 格式化安全分析结果为卡片格式
+ * @param {Object} result - 安全检测结果
+ * @returns {Object} 格式化后的卡片对象
+ */
+function formatSecurityAnalysisToCard(result) {
+    if (!result || !result.result) {
+        return {
+            header: {
+                title: {
+                    tag: "plain_text",
+                    content: "❌ 无法获取安全分析结果"
+                }
+            },
+            elements: []
+        };
+    }
+
+    const elements = [];
+    for (const [address, data] of Object.entries(result.result)) {
+        // 1. 代币基本信息
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: `**合约地址**: ${address}`
+            }
+        });
+
+        // 2. 合约安全
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: "**合约安全**"
+            }
+        });
+
+        const contractSecurity = [
+            [`是否可铸造`, data.mintable?.status === '1' ? '✅' : '❌'],
+            [`是否可冻结`, data.freezable?.status === '1' ? '✅' : '❌'],
+            [`是否可关闭`, data.closable?.status === '1' ? '✅' : '❌'],
+            [`是否可转账`, data.non_transferable === '1' ? '❌' : '✅'],
+            [`是否可信代币`, data.trusted_token === 1 ? '✅' : '❌'],
+            [`默认账户状态`, data.default_account_state === '1' ? '已初始化' : '未初始化'],
+            [`是否可升级默认账户状态`, data.default_account_state_upgradable?.status === '1' ? '✅' : '❌'],
+            [`是否可升级转账费用`, data.transfer_fee_upgradable?.status === '1' ? '✅' : '❌'],
+            [`是否可升级转账钩子`, data.transfer_hook_upgradable?.status === '1' ? '✅' : '❌']
+        ].filter(([k, v]) => v !== '未知')
+         .map(([k, v]) => `${k}: ${v}`);
+
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: contractSecurity.join('\n')
+            }
+        });
+
+        // 3. 交易安全
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: "**交易安全**"
+            }
+        });
+
+        const tradingSecurity = [
+            [`余额可变权限`, data.balance_mutable_authority?.status === '1' ? '✅' : '❌'],
+            [`转账费用`, data.transfer_fee ? '✅' : '❌'],
+            [`转账钩子`, data.transfer_hook?.length > 0 ? '✅' : '❌']
+        ].filter(([k, v]) => v !== '未知')
+         .map(([k, v]) => `${k}: ${v}`);
+
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: tradingSecurity.join('\n')
+            }
+        });
+
+        // 4. 代币信息
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: "**代币信息**"
+            }
+        });
+
+        const tokenInfo = [
+            [`名称`, data.metadata?.name || '未知'],
+            [`符号`, data.metadata?.symbol || '未知'],
+            [`描述`, data.metadata?.description || '未知'],
+            [`持有人数量`, data.holder_count || '未知'],
+            [`总供应量`, data.total_supply || '未知']
+        ].filter(([k, v]) => v !== '未知')
+         .map(([k, v]) => `${k}: ${v}`);
+
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: tokenInfo.join('\n')
+            }
+        });
+
+        // 5. 高级信息
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: "**高级信息**"
+            }
+        });
+
+        const advancedInfo = [];
+        
+        // 添加元数据权限信息
+        if (data.metadata_mutable) {
+            advancedInfo.push(`元数据可升级: ${data.metadata_mutable.status === '1' ? '✅' : '❌'}`);
+            if (data.metadata_mutable.metadata_upgrade_authority) {
+                advancedInfo.push('升级权限地址:');
+                data.metadata_mutable.metadata_upgrade_authority.forEach(auth => {
+                    advancedInfo.push(`- ${auth.address} ${auth.malicious_address ? '(⚠️ 可疑地址)' : ''}`);
+                });
+            }
+        }
+
+        // 添加创建者信息
+        if (data.creators && data.creators.length > 0) {
+            advancedInfo.push('创建者地址:');
+            data.creators.forEach(creator => {
+                advancedInfo.push(`- ${creator.address} ${creator.verified ? '(已验证)' : ''}`);
+            });
+        }
+
+        // 添加 Top10 持币地址信息
+        if (data.holders && data.holders.length > 0) {
+            advancedInfo.push('\nTop10 持币地址:');
+            data.holders.slice(0, 10).forEach((holder, index) => {
+                advancedInfo.push(`#${index + 1} ${holder.account}`);
+                advancedInfo.push(`余额: ${holder.balance}`);
+                advancedInfo.push(`占比: ${holder.percent}%`);
+                if (holder.is_locked) advancedInfo.push('状态: 已锁定');
+                if (holder.tag) advancedInfo.push(`标签: ${holder.tag}`);
+                advancedInfo.push('---');
+            });
+        }
+
+        // 如果没有高级信息，添加提示
+        if (advancedInfo.length === 0) {
+            advancedInfo.push('暂无高级信息');
+        }
+
+        elements.push({
+            tag: "div",
+            text: {
+                tag: "lark_md",
+                content: advancedInfo.join('\n')
+            }
+        });
+    }
+
+    return {
+        header: {
+            title: {
+                tag: "plain_text",
+                content: "🔍 代币安全分析结果"
+            }
+        },
+        elements: elements
+    };
+}
+
+/**
  * 主函数
  */
 async function main() {
@@ -333,7 +532,7 @@ async function main() {
         if (addresses.length === 1) {
             const result = await checkTokenSecurity(chainId, addresses[0]);
             console.log("\n代币安全检测结果:");
-            printSecurityAnalysis(result);
+            console.log(printSecurityAnalysis(result, chainId));
         } else {
             const results = await batchCheckTokens(chainId, addresses);
             console.log("\n批量检测结果:");
@@ -342,7 +541,7 @@ async function main() {
                 if (r.error) {
                     console.log(`检测失败: ${r.error}`);
                 } else {
-                    printSecurityAnalysis(r.result);
+                    console.log(printSecurityAnalysis(r.result.result, chainId));
                 }
             }
         }
@@ -361,5 +560,6 @@ module.exports = {
     checkTokenSecurity,
     isValidAddress,
     printSecurityAnalysis,
-    batchCheckTokens
+    batchCheckTokens,
+    formatSecurityAnalysisToCard
 }; 
