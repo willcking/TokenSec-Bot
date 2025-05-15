@@ -10,7 +10,6 @@
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/your-username/TokenSec-Bot.git
 cd TokenSec-Bot/robot
 ```
 

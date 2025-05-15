@@ -371,8 +371,15 @@ const eventDispatcher = new lark.EventDispatcher({}).register({
             }
 
             open_chat_id = data.message.chat_id;  // 在这里赋值
-            const msg = JSON.parse(data.message.content).text;
+            let msg = JSON.parse(data.message.content).text;
             console.log('收到消息:', msg);
+
+            // 移除@机器人的部分
+            if (msg.includes('@_user_') || msg.toLowerCase().includes('@tokenhelp')) {
+                // 移除@开头的部分直到第一个空格
+                msg = msg.replace(/^@[^\s]+\s+/, '');
+                console.log('处理后的消息:', msg);
+            }
 
             // 检查空消息
             if (!msg || !msg.trim()) {
